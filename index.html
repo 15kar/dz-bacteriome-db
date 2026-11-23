@@ -48,6 +48,7 @@
       transition: background 0.25s ease, color 0.25s ease;
     }
 
+    /* رسالة تنبيهية علوية حمراء بسطر واحد على جميع الأجهزة */
     .top-toast {
       position: fixed;
       top: 14px;
@@ -190,6 +191,7 @@
     .card h2 { font-size: 1.15rem; margin-bottom: 8px; }
     .card p { color: var(--muted); font-size: 0.95rem; }
 
+    /* Modal */
     .modal-backdrop {
       position: fixed; inset: 0; z-index: 60;
       background: rgba(0, 0, 0, 0.72);
@@ -266,6 +268,7 @@
   </style>
 </head>
 <body>
+  <!-- رسالة تنبيهية علوية حمراء بسطر واحد لمدة 3 ثوانٍ -->
   <div class="top-toast" id="topToast" role="alert" aria-live="assertive">
     <i class="fa-solid fa-circle-exclamation"></i>
     <span id="topToastText"></span>
@@ -347,6 +350,7 @@
     </section>
   </main>
 
+  <!-- نافذة Connexion: تسجيل الدخول / إنشاء حساب / نسيت كلمة السر -->
   <div class="modal-backdrop" id="authModal" onclick="if(event.target===this) closeAuthModal()">
     <div class="modal">
       <div class="modal-header">
@@ -354,6 +358,7 @@
         <button type="button" onclick="closeAuthModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
 
+      <!-- 1. شاشة تسجيل الدخول -->
       <form id="loginView" class="form-grid" onsubmit="handleLogin(event)">
         <div class="field">
           <label><i class="fa-solid fa-envelope"></i> <span id="lblLoginEmail">البريد الإلكتروني</span></label>
@@ -379,6 +384,7 @@
         </div>
       </form>
 
+      <!-- 2. شاشة إنشاء حساب جديد (الاسم، اللقب، تاريخ الميلاد، المؤسسة، الوثيقتين، ثم كلمة السر) -->
       <form id="registerView" class="form-grid hidden" onsubmit="handleRegisterSubmit(event)">
         <div id="regStep1" class="form-grid">
           <div class="step-indicator">
@@ -443,6 +449,7 @@
           </div>
         </div>
 
+        <!-- الخطوة 2: إدخال كلمة السر بعد إتمام جميع التفاصيل -->
         <div id="regStep2" class="form-grid hidden">
           <div class="step-indicator">
             <span id="txtRegStep2"><i class="fa-solid fa-lock"></i> تعيين كلمة السر</span>
@@ -468,6 +475,7 @@
         </div>
       </form>
 
+      <!-- 3. شاشة حالة الحساب (قيد التحقق / مرفوض / محظور) -->
       <div id="statusView" class="form-grid hidden">
         <div class="status-box">
           <strong id="statusTitle"></strong>
@@ -479,6 +487,7 @@
         </button>
       </div>
 
+      <!-- 4. شاشة نسيت كلمة السر -->
       <form id="forgotView" class="form-grid hidden" onsubmit="handleForgotPassword(event)">
         <div class="field">
           <label><i class="fa-solid fa-envelope"></i> <span id="lblForgotEmail">البريد الإلكتروني</span></label>
@@ -771,202 +780,253 @@
       }
     }
 
-    function renderInstitutionOptions(list) {
-      const d = getDict();
-      const select = document.getElementById("regInstitution");
-      const prev = select.value;
-      select.innerHTML = <option value="">${d.selectInst} (${list.length})</option>;
-      list.forEach(inst => {
-        const opt = document.createElement("option");
-        opt.value = inst.id;
-        opt.textContent = inst.wilaya ? ${inst.acronym} — ${inst.name_fr} (${inst.wilaya}) : ${inst.acronym} — ${inst.name_fr};
-        select.appendChild(opt);
-      });
-      if (prev) select.value = prev;
-    }
 
-    function filterInstitutions() {
-      const q = document.getElementById("instSearch").value.trim().toLowerCase();
-      const filtered = allInstitutions.filter(inst =>
-        inst.acronym.toLowerCase().includes(q) ||
-        inst.name_fr.toLowerCase().includes(q) ||
-        (inst.wilaya && inst.wilaya.toLowerCase().includes(q))
-      );
-      renderInstitutionOptions(filtered);
-      checkRegStep1();
-    }
+function renderInstitutionOptions(list) {
+  const d = getDict();
+  const select = document.getElementById("regInstitution");
+  const prev = select.value;
 
-    function onFilePick(inputId, boxId, statusId) {
-      const input = document.getElementById(inputId);
-      const box = document.getElementById(boxId);
-      const status = document.getElementById(statusId);
-      if (input.files && input.files[0]) {
-        box.classList.add("uploaded");
-        status.innerHTML = <i class="fa-solid fa-circle-check"></i> ${input.files[0].name};
-      } else {
-        box.classList.remove("uploaded");
-        status.textContent = getDict().noFile;
-      }
-      checkRegStep1();
-    }
+  select.innerHTML = `<option value="">${d.selectInst} (${list.length})</option>`;
 
-    function checkRegStep1() {
-      const first = document.getElementById("firstName").value.trim();
-      const last = document.getElementById("lastName").value.trim();
-      const email = document.getElementById("regEmail").value.trim();
-      const dob = document.getElementById("regDob").value;
-      const inst = document.getElementById("regInstitution").value;
-      const f1 = document.getElementById("nationalIdFile").files.length > 0;
-      const f2 = document.getElementById("proofDocFile").files.length > 0;
-      document.getElementById("nextToPasswordBtn").disabled = !(first && last && email && dob && inst && f1 && f2);
-    }
+  list.forEach(inst => {
+    const opt = document.createElement("option");
+    opt.value = inst.id;
 
-    function goToRegStep2() {
-      document.getElementById("regStep1").classList.add("hidden");
-      document.getElementById("regStep2").classList.remove("hidden");
-    }
+    opt.textContent = inst.wilaya
+      ? `${inst.acronym} — ${inst.name_fr} (${inst.wilaya})`
+      : `${inst.acronym} — ${inst.name_fr}`;
 
-    function backToRegStep1() {
-      document.getElementById("regStep2").classList.add("hidden");
-      document.getElementById("regStep1").classList.remove("hidden");
-    }
+    select.appendChild(opt);
+  });
 
-    function showStatusScreen(statusValue, code = "") {
-      const d = getDict();
-      openModal("status");
-      if (statusValue === "bloquer") {
-        document.getElementById("statusTitle").textContent = d.blockedTitle;
-        document.getElementById("statusDesc").textContent = d.blockedDesc;
-      } else if (statusValue === "non") {
-        document.getElementById("statusTitle").textContent = d.rejectedTitle;
-        document.getElementById("statusDesc").textContent = d.rejectedDesc;
-      } else {
-        document.getElementById("statusTitle").textContent = d.pendingTitle;
-        document.getElementById("statusDesc").textContent = d.pendingDesc;
-      }
-      document.getElementById("statusCodeLine").textContent = code ? ID: ${code} : "";
-    }
+  if (prev) select.value = prev;
+}
 
-    async function logoutAndClose() {
-      await supabaseClient.auth.signOut();
-      closeAuthModal();
-    }
+function filterInstitutions() {
+  const q = document.getElementById("instSearch").value.trim().toLowerCase();
 
-    async function handleLogin(e) {
-      e.preventDefault();
-      const d = getDict();
-      const email = document.getElementById("loginEmail").value.trim();
-      const password = document.getElementById("loginPassword").value;
+  const filtered = allInstitutions.filter(inst =>
+    inst.acronym.toLowerCase().includes(q) ||
+    inst.name_fr.toLowerCase().includes(q) ||
+    (inst.wilaya && inst.wilaya.toLowerCase().includes(q))
+  );
 
-      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-      if (error || !data?.user) {
-        showRedToast(d.errWrongCreds);
-        return;
-      }
+  renderInstitutionOptions(filtered);
+  checkRegStep1();
+}
 
-      const { data: profile, error: pErr } = await supabaseClient
-        .from("profiles")
-        .select("verification_status, contributor_code")
-        .eq("id", data.user.id)
-        .single();
+function onFilePick(inputId, boxId, statusId) {
+  const input = document.getElementById(inputId);
+  const box = document.getElementById(boxId);
+  const status = document.getElementById(statusId);
 
-      if (pErr || !profile) {
-        await supabaseClient.auth.signOut();
-        showRedToast(d.errWrongCreds);
-        return;
-      }
+  if (input.files && input.files[0]) {
+    box.classList.add("uploaded");
+    status.innerHTML = `<i class="fa-solid fa-circle-check"></i> ${input.files[0].name}`;
+  } else {
+    box.classList.remove("uploaded");
+    status.textContent = getDict().noFile;
+  }
 
-      const st = (profile.verification_status || "en attente").toLowerCase().trim();
-      if (st === "oui") {
-        window.location.href = "dashboard.html";
-      } else if (st === "bloquer") {
-        await supabaseClient.auth.signOut();
-        showRedToast(d.errBlocked);
-        showStatusScreen("bloquer", profile.contributor_code || "");
-      } else if (st === "non") {
-        await supabaseClient.auth.signOut();
-        showRedToast(d.errRejected);
-        showStatusScreen("non", profile.contributor_code || "");
-      } else {
-        await supabaseClient.auth.signOut();
-        showRedToast(d.errPending);
-        showStatusScreen("en attente", profile.contributor_code || "");
-      }
-    }
+  checkRegStep1();
+}
 
-    async function handleRegisterSubmit(e) {
-      e.preventDefault();
-      const d = getDict();
-      const pass = document.getElementById("regPassword").value;
-      const confirm = document.getElementById("regPasswordConfirm").value;
-      if (pass !== confirm) {
-        showRedToast(d.errPassMismatch);
-        return;
-      }
+function checkRegStep1() {
+  const first = document.getElementById("firstName").value.trim();
+  const last = document.getElementById("lastName").value.trim();
+  const email = document.getElementById("regEmail").value.trim();
+  const dob = document.getElementById("regDob").value;
+  const inst = document.getElementById("regInstitution").value;
 
-      const firstName = document.getElementById("firstName").value.trim();
-      const lastName = document.getElementById("lastName").value.trim();
-      const fullName = ${firstName} ${lastName}.trim();
-      const email = document.getElementById("regEmail").value.trim();
-      const dob = document.getElementById("regDob").value;
-      const institutionId = document.getElementById("regInstitution").value;
-      const natFile = document.getElementById("nationalIdFile").files[0];
-      const proofFile = document.getElementById("proofDocFile").files[0];
+  const f1 = document.getElementById("nationalIdFile").files.length > 0;
+  const f2 = document.getElementById("proofDocFile").files.length > 0;
 
-      const { data: signUpData, error } = await supabaseClient.auth.signUp({
-        email,
-        password: pass,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName,
-            full_name: fullName,
-            date_of_birth: dob,
-            institution_id: institutionId
-          }
-        }
-      });
+  document.getElementById("nextToPasswordBtn").disabled =
+    !(first && last && email && dob && inst && f1 && f2);
+}
 
-      if (error) {
-        showRedToast(error.message);
-        return;
-      }
+function goToRegStep2() {
+  document.getElementById("regStep1").classList.add("hidden");
+  document.getElementById("regStep2").classList.remove("hidden");
+}
 
-      const userId = signUpData?.user?.id;
-      if (userId && signUpData.session) {
-        const natPath = ${userId}/national_id_${Date.now()}_${natFile.name};
-        const proofPath = ${userId}/proof_doc_${Date.now()}_${proofFile.name};
-        await supabaseClient.storage.from("verification-docs").upload(natPath, natFile);
-        await supabaseClient.storage.from("verification-docs").upload(proofPath, proofFile);
-        await supabaseClient.from("profiles").update({
-          first_name: firstName,
-          last_name: lastName,
-          full_name: fullName,
-          date_of_birth: dob,
-          institution_id: institutionId,
-          id_document_path: natPath,
-          academic_proof_path: proofPath,
-          verification_status: "en attente"
-        }).eq("id", userId);
-        await supabaseClient.auth.signOut();
-      }
+function backToRegStep1() {
+  document.getElementById("regStep2").classList.add("hidden");
+  document.getElementById("regStep1").classList.remove("hidden");
+}
 
-      showStatusScreen("en attente");
-    }
+function showStatusScreen(statusValue, code = "") {
+  const d = getDict();
 
-    async function handleForgotPassword(e) {
-      e.preventDefault();
-      const email = document.getElementById("forgotEmail").value.trim();
-      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
-        redirectTo: ${window.location.origin}/index.html
-      });
-      if (error) {
-        showRedToast(error.message);
-      } else {
-        showRedToast(email);
-        openModal("login");
+  openModal("status");
+
+  if (statusValue === "bloquer") {
+    document.getElementById("statusTitle").textContent = d.blockedTitle;
+    document.getElementById("statusDesc").textContent = d.blockedDesc;
+  } else if (statusValue === "non") {
+    document.getElementById("statusTitle").textContent = d.rejectedTitle;
+    document.getElementById("statusDesc").textContent = d.rejectedDesc;
+  } else {
+    document.getElementById("statusTitle").textContent = d.pendingTitle;
+    document.getElementById("statusDesc").textContent = d.pendingDesc;
+  }
+
+  document.getElementById("statusCodeLine").textContent =
+    code ? `ID: ${code}` : "";
+}
+
+async function logoutAndClose() {
+  await supabaseClient.auth.signOut();
+  closeAuthModal();
+}
+
+async function handleLogin(e) {
+  e.preventDefault();
+
+  const d = getDict();
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+
+  const { data, error } = await supabaseClient.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error || !data?.user) {
+    showRedToast(d.errWrongCreds);
+    return;
+  }
+
+  const { data: profile, error: pErr } = await supabaseClient
+    .from("profiles")
+    .select("verification_status, contributor_code")
+    .eq("id", data.user.id)
+    .single();
+
+  if (pErr || !profile) {
+    await supabaseClient.auth.signOut();
+    showRedToast(d.errWrongCreds);
+    return;
+  }
+
+  const st = (profile.verification_status || "en attente")
+    .toLowerCase()
+    .trim();
+
+  if (st === "oui") {
+    window.location.href = "dashboard.html";
+
+  } else if (st === "bloquer") {
+    await supabaseClient.auth.signOut();
+    showRedToast(d.errBlocked);
+    showStatusScreen("bloquer", profile.contributor_code || "");
+
+  } else if (st === "non") {
+    await supabaseClient.auth.signOut();
+    showRedToast(d.errRejected);
+    showStatusScreen("non", profile.contributor_code || "");
+
+  } else {
+    await supabaseClient.auth.signOut();
+    showRedToast(d.errPending);
+    showStatusScreen("en attente", profile.contributor_code || "");
+  }
+}
+
+async function handleRegisterSubmit(e) {
+  e.preventDefault();
+
+  const d = getDict();
+
+  const pass = document.getElementById("regPassword").value;
+  const confirm = document.getElementById("regPasswordConfirm").value;
+
+  if (pass !== confirm) {
+    showRedToast(d.errPassMismatch);
+    return;
+  }
+
+  const firstName = document.getElementById("firstName").value.trim();
+  const lastName = document.getElementById("lastName").value.trim();
+  const fullName = `${firstName} ${lastName}`.trim();
+
+  const email = document.getElementById("regEmail").value.trim();
+  const dob = document.getElementById("regDob").value;
+  const institutionId = document.getElementById("regInstitution").value;
+
+  const natFile = document.getElementById("nationalIdFile").files[0];
+  const proofFile = document.getElementById("proofDocFile").files[0];
+
+  const { data: signUpData, error } = await supabaseClient.auth.signUp({
+    email,
+    password: pass,
+    options: {
+      data: {
+        first_name: firstName,
+        last_name: lastName,
+        full_name: fullName,
+        date_of_birth: dob,
+        institution_id: institutionId
       }
     }
+  });
+
+  if (error) {
+    showRedToast(error.message);
+    return;
+  }
+
+  const userId = signUpData?.user?.id;
+
+  if (userId && signUpData.session) {
+    const natPath = `${userId}/national_id_${Date.now()}_${natFile.name}`;
+    const proofPath = `${userId}/proof_doc_${Date.now()}_${proofFile.name}`;
+
+    await supabaseClient.storage
+      .from("verification-docs")
+      .upload(natPath, natFile);
+
+    await supabaseClient.storage
+      .from("verification-docs")
+      .upload(proofPath, proofFile);
+
+    await supabaseClient
+      .from("profiles")
+      .update({
+        first_name: firstName,
+        last_name: lastName,
+        full_name: fullName,
+        date_of_birth: dob,
+        institution_id: institutionId,
+        id_document_path: natPath,
+        academic_proof_path: proofPath,
+        verification_status: "en attente"
+      })
+      .eq("id", userId);
+
+    await supabaseClient.auth.signOut();
+  }
+
+  showStatusScreen("en attente");
+}
+
+async function handleForgotPassword(e) {
+  e.preventDefault();
+
+  const email = document.getElementById("forgotEmail").value.trim();
+
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/index.html`
+  });
+
+  if (error) {
+    showRedToast(error.message);
+  } else {
+    showRedToast(email);
+    openModal("login");
+  }
+}
+
 
     updateThemeUI();
   </script>
