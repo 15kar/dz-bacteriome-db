@@ -21,6 +21,8 @@ create table if not exists public.institutions (
 create table if not exists public.profiles (
     id uuid primary key references auth.users(id) on delete cascade,
     contributor_code text unique,
+    first_name text,
+    last_name text,
     full_name text not null,
     email text unique,
     date_of_birth date,
@@ -28,6 +30,7 @@ create table if not exists public.profiles (
     department_or_specialty text,
     id_document_path text,
     academic_proof_path text,
+    verification_status text not null default 'en attente' check (verification_status in ('en attente', 'oui', 'non', 'bloquer')),
     role text not null default 'contributor' check (role in ('admin', 'curator', 'contributor')),
     is_verified boolean not null default false,
     bio text,
@@ -35,11 +38,20 @@ create table if not exists public.profiles (
     updated_at timestamptz not null default now()
 );
 
--- التأكد من وجود الأعمدة الجديدة في حال كان الجدول منشأً مسبقاً
 alter table public.profiles
+add column if not exists first_name text,
+add column if not exists last_name text,
 add column if not exists date_of_birth date,
 add column if not exists id_document_path text,
-add column if not exists academic_proof_path text;
+add column if not exists academic_proof_path text,
+add column if not exists verification_status text not null default 'en attente';
+
+alter table public.profiles
+drop constraint if exists profiles_verification_status_check;
+
+alter table public.profiles
+add constraint profiles_verification_status_check
+check (verification_status in ('en attente', 'oui', 'non', 'bloquer'));
 
 -- ==========================================
 -- 3. جدول العزلات البكتيرية (isolates)
@@ -135,26 +147,44 @@ returns trigger
 language plpgsql
 security definer set search_path = public
 as $$
+declare
+    v_first text := nullif(btrim(new.raw_user_meta_data ->> 'first_name'), '');
+    v_last text := nullif(btrim(new.raw_user_meta_data ->> 'last_name'), '');
+    v_full text;
 begin
+    v_full := coalesce(
+        nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
+        nullif(btrim(coalesce(v_first, '') || ' ' || coalesce(v_last, '')), ''),
+        split_part(new.email, '@', 1)
+    );
+
     insert into public.profiles (
         id,
+        first_name,
+        last_name,
         full_name,
         email,
         date_of_birth,
         institution_id,
         department_or_specialty,
         id_document_path,
-        academic_proof_path
+        academic_proof_path,
+        verification_status,
+        is_verified
     )
     values (
         new.id,
-        coalesce(nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''), split_part(new.email, '@', 1)),
+        v_first,
+        v_last,
+        v_full,
         new.email,
         nullif(new.raw_user_meta_data ->> 'date_of_birth', '')::date,
         nullif(new.raw_user_meta_data ->> 'institution_id', '')::uuid,
         nullif(btrim(new.raw_user_meta_data ->> 'department_or_specialty'), ''),
         nullif(btrim(new.raw_user_meta_data ->> 'id_document_path'), ''),
-        nullif(btrim(new.raw_user_meta_data ->> 'academic_proof_path'), '')
+        nullif(btrim(new.raw_user_meta_data ->> 'academic_proof_path'), ''),
+        'en attente',
+        false
     )
     on conflict (id) do nothing;
 
@@ -168,11 +198,34 @@ after insert on auth.users
 for each row execute function public.handle_new_user();
 
 -- ==========================================
--- 7. فهارس لتسريع البحث والفرز
+-- 7. مزامنة is_verified مع verification_status عند التحديث
+-- ==========================================
+create or replace function public.sync_profile_verification_status()
+returns trigger
+language plpgsql
+as $$
+begin
+    if new.verification_status = 'oui' then
+        new.is_verified := true;
+    else
+        new.is_verified := false;
+    end if;
+    return new;
+end;
+$$;
+
+drop trigger if exists trg_sync_profile_verification_status on public.profiles;
+create trigger trg_sync_profile_verification_status
+before insert or update of verification_status on public.profiles
+for each row execute function public.sync_profile_verification_status();
+
+-- ==========================================
+-- 8. فهارس لتسريع البحث والفرز
 -- ==========================================
 create index if not exists idx_institutions_category on public.institutions (category);
 create index if not exists idx_institutions_region on public.institutions (region);
 create index if not exists idx_profiles_institution on public.profiles (institution_id);
+create index if not exists idx_profiles_verification_status on public.profiles (verification_status);
 create index if not exists idx_isolates_genus_species on public.isolates (genus, species);
 create index if not exists idx_isolates_wilaya on public.isolates (wilaya);
 create index if not exists idx_isolates_status on public.isolates (status);
@@ -181,7 +234,7 @@ create index if not exists idx_sequences_isolate on public.sequences (isolate_id
 create index if not exists idx_sequences_type on public.sequences (sequence_type);
 
 -- ==========================================
--- 8. دالة تحديث تاريخ التعديل تلقائياً
+-- 9. دالة تحديث تاريخ التعديل تلقائياً
 -- ==========================================
 create or replace function public.handle_updated_at()
 returns trigger
@@ -209,7 +262,7 @@ before update on public.sequences
 for each row execute function public.handle_updated_at();
 
 -- ==========================================
--- 9. تفعيل نظام الصلاحيات (Row Level Security)
+-- 10. تفعيل نظام الصلاحيات (Row Level Security)
 -- ==========================================
 alter table public.institutions enable row level security;
 alter table public.profiles enable row level security;
@@ -300,7 +353,7 @@ to authenticated
 using (auth.uid() = contributor_id);
 
 -- ==========================================
--- 10. مخزن الوثائق الثبوتية الخاص (verification-docs)
+-- 11. مخزن الوثائق الثبوتية الخاص (verification-docs)
 -- ==========================================
 insert into storage.buckets (id, name, public)
 values ('verification-docs', 'verification-docs', false)
@@ -325,7 +378,7 @@ using (
 );
 
 -- ==========================================
--- 11. إدخال كافة الجامعات والمدارس العليا والمعاهد المعتمدة
+-- 12. إدخال كافة الجامعات والمدارس العليا والمعاهد المعتمدة
 -- ==========================================
 insert into public.institutions (acronym, name_fr, category, region, wilaya) values
 ('USTHB', 'Université des Sciences et de la Technologie Houari Boumediene', 'Université / Centre Universitaire', 'Centre', 'Alger'),
@@ -431,3 +484,68 @@ insert into public.institutions (acronym, name_fr, category, region, wilaya) val
 ('INFSPM', 'Instituts Nationaux de Formation Supérieure Paramédicale (Spécialité : Laborantins de Santé Publique)', 'Institut / Centre de Recherche', 'National', null),
 ('INFEP', 'Institut National de la Formation et de l''Enseignement Professionnels (Contrôle de Qualité Agroalimentaire)', 'Institut / Centre de Recherche', 'National', null)
 on conflict (name_fr) do nothing;
+-- 1. إضافة أعمدة الاسم، اللقب، تاريخ الميلاد، وحالة التحقق بالفرنسية إلى جدول profiles
+alter table public.profiles
+add column if not exists first_name text,
+add column if not exists last_name text,
+add column if not exists date_of_birth date,
+add column if not exists id_document_path text,
+add column if not exists academic_proof_path text,
+add column if not exists verification_status text not null default 'en attente';
+
+-- توحيد قيد الحالات بالفرنسية (قيد التحقق، مصرح له، مرفوض، محظور)
+alter table public.profiles
+drop constraint if exists profiles_verification_status_check;
+
+alter table public.profiles
+add constraint profiles_verification_status_check
+check (verification_status in ('en attente', 'oui', 'non', 'bloquer'));
+
+-- 2. تحديث دالة إنشاء ملف الباحث تلقائياً عند التسجيل بالوضع الافتراضي 'en attente'
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+declare
+    v_first text := nullif(btrim(new.raw_user_meta_data ->> 'first_name'), '');
+    v_last text := nullif(btrim(new.raw_user_meta_data ->> 'last_name'), '');
+    v_full text;
+begin
+    v_full := coalesce(
+        nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''),
+        nullif(btrim(coalesce(v_first, '') || ' ' || coalesce(v_last, '')), ''),
+        split_part(new.email, '@', 1)
+    );
+
+    insert into public.profiles (
+        id,
+        first_name,
+        last_name,
+        full_name,
+        email,
+        date_of_birth,
+        institution_id,
+        id_document_path,
+        academic_proof_path,
+        verification_status,
+        is_verified
+    )
+    values (
+        new.id,
+        v_first,
+        v_last,
+        v_full,
+        new.email,
+        nullif(new.raw_user_meta_data ->> 'date_of_birth', '')::date,
+        nullif(new.raw_user_meta_data ->> 'institution_id', '')::uuid,
+        nullif(btrim(new.raw_user_meta_data ->> 'id_document_path'), ''),
+        nullif(btrim(new.raw_user_meta_data ->> 'academic_proof_path'), ''),
+        'en attente',
+        false
+    )
+    on conflict (id) do nothing;
+
+    return new;
+end;
+$$;
