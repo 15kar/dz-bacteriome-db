@@ -55,7 +55,7 @@
     header {
       position: sticky;
       top: 0;
-      z-index: 20;
+      z-index: 30;
       backdrop-filter: blur(14px);
       background: color-mix(in srgb, var(--bg) 82%, transparent);
       border-bottom: 1px solid var(--border);
@@ -97,48 +97,87 @@
       gap: 8px;
     }
 
-    .lang-group {
-      display: inline-flex;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 3px;
-      gap: 2px;
+    .dropdown {
+      position: relative;
     }
 
     button {
       cursor: pointer;
-      border: 1px solid transparent;
-      background: transparent;
+      border: 1px solid var(--border);
+      background: var(--surface);
       color: var(--text);
       font-weight: 600;
       font-size: 0.88rem;
-      padding: 7px 12px;
-      border-radius: 9px;
+      padding: 8px 13px;
+      border-radius: 11px;
       display: inline-flex;
       align-items: center;
-      gap: 6px;
+      gap: 7px;
       transition: all 0.2s ease;
-    }
-
-    .lang-btn.active {
-      background: var(--accent);
-      color: #ffffff;
-    }
-
-    .theme-btn {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 9px 14px;
     }
 
     button:hover {
       border-color: var(--accent);
+      background: var(--surface-2);
     }
 
     button:active {
       transform: scale(0.97);
+    }
+
+    .login-btn {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+
+    .login-btn:hover {
+      background: color-mix(in srgb, var(--accent) 88%, #000);
+      border-color: var(--accent);
+    }
+
+    .caret {
+      font-size: 0.75rem;
+      transition: transform 0.2s ease;
+    }
+
+    .dropdown.open .caret {
+      transform: rotate(180deg);
+    }
+
+    .dropdown-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      inset-inline-start: 0;
+      min-width: 170px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 6px;
+      box-shadow: var(--shadow);
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      z-index: 40;
+    }
+
+    .dropdown.open .dropdown-menu {
+      display: flex;
+    }
+
+    .lang-option {
+      width: 100%;
+      justify-content: space-between;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 8px 11px;
+      border-radius: 9px;
+    }
+
+    .lang-option.active {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border-color: color-mix(in srgb, var(--accent) 35%, transparent);
     }
 
     .hero {
@@ -256,21 +295,38 @@
         <span class="brand-icon"><i class="fa-solid fa-bacterium"></i></span>
         <span>dz-bacteriome-db</span>
       </div>
+
       <div class="controls">
-        <div class="lang-group" role="group" aria-label="Language selector">
-          <button class="lang-btn active" data-lang="ar" onclick="setLang('ar')">
-            <i class="fa-solid fa-language"></i> العربية
+        <div class="dropdown" id="langDropdown">
+          <button type="button" id="langToggleBtn" onclick="toggleLangMenu(event)" aria-expanded="false">
+            <i class="fa-solid fa-language"></i>
+            <span>Lange</span>
+            <i class="fa-solid fa-chevron-down caret"></i>
           </button>
-          <button class="lang-btn" data-lang="fr" onclick="setLang('fr')">
-            <i class="fa-solid fa-earth-europe"></i> Français
-          </button>
-          <button class="lang-btn" data-lang="en" onclick="setLang('en')">
-            <i class="fa-solid fa-globe"></i> English
-          </button>
+          <div class="dropdown-menu" id="langMenu" role="menu">
+            <button type="button" class="lang-option active" data-lang="ar" onclick="selectLang('ar')">
+              <span>العربية</span>
+              <i class="fa-solid fa-check"></i>
+            </button>
+            <button type="button" class="lang-option" data-lang="fr" onclick="selectLang('fr')">
+              <span>Français</span>
+              <i class="fa-solid fa-check"></i>
+            </button>
+            <button type="button" class="lang-option" data-lang="en" onclick="selectLang('en')">
+              <span>English</span>
+              <i class="fa-solid fa-check"></i>
+            </button>
+          </div>
         </div>
-        <button class="theme-btn" id="themeBtn" onclick="toggleTheme()">
+
+        <button type="button" class="theme-btn" id="themeBtn" onclick="toggleTheme()">
           <i class="fa-solid fa-sun" id="themeIcon"></i>
           <span id="themeText">نهاري</span>
+        </button>
+
+        <button type="button" class="login-btn" id="loginBtn" onclick="handleLoginClick()">
+          <i class="fa-solid fa-right-to-bracket"></i>
+          <span id="loginText">Connexion</span>
         </button>
       </div>
     </div>
@@ -348,7 +404,8 @@
         c4d: "حفظ تسلسلات 16S rRNA وغيرها مع حساب تلقائي لطول التسلسل وسياسات حماية صارمة.",
         footer: "dz-bacteriome-db — منصة مفتوحة المصدر للبيانات الميكروبيولوجية والجينية",
         lightLabel: "نهاري",
-        darkLabel: "ليلي"
+        darkLabel: "ليلي",
+        loginLabel: "Connexion"
       },
       fr: {
         dir: "ltr",
@@ -365,7 +422,8 @@
         c4d: "Séquences 16S rRNA et autres avec calcul automatique de la longueur et contrôle d'accès strict.",
         footer: "dz-bacteriome-db — Plateforme ouverte de microbiologie et génomique",
         lightLabel: "Clair",
-        darkLabel: "Sombre"
+        darkLabel: "Sombre",
+        loginLabel: "Connexion"
       },
       en: {
         dir: "ltr",
@@ -382,11 +440,20 @@
         c4d: "Storing 16S rRNA and other sequences with automatic length calculation and row-level security policies.",
         footer: "dz-bacteriome-db — Open-Source Microbial & Genomic Database",
         lightLabel: "Light",
-        darkLabel: "Dark"
+        darkLabel: "Dark",
+        loginLabel: "Connexion"
       }
     };
 
-    function setLang(lang) {
+    function toggleLangMenu(event) {
+      event.stopPropagation();
+      const dropdown = document.getElementById("langDropdown");
+      const btn = document.getElementById("langToggleBtn");
+      const isOpen = dropdown.classList.toggle("open");
+      btn.setAttribute("aria-expanded", String(isOpen));
+    }
+
+    function selectLang(lang) {
       const d = i18n[lang];
       document.documentElement.lang = lang;
       document.documentElement.dir = d.dir;
@@ -402,12 +469,24 @@
       document.getElementById("c4Title").textContent = d.c4t;
       document.getElementById("c4Desc").textContent = d.c4d;
       document.getElementById("footerText").textContent = d.footer;
+      document.getElementById("loginText").textContent = d.loginLabel;
 
-      document.querySelectorAll(".lang-btn").forEach(btn => {
-        btn.classList.toggle("active", btn.dataset.lang === lang);
+      document.querySelectorAll(".lang-option").forEach(option => {
+        option.classList.toggle("active", option.dataset.lang === lang);
       });
+
+      document.getElementById("langDropdown").classList.remove("open");
+      document.getElementById("langToggleBtn").setAttribute("aria-expanded", "false");
       updateThemeUI();
     }
+
+    document.addEventListener("click", (event) => {
+      const dropdown = document.getElementById("langDropdown");
+      if (dropdown && !dropdown.contains(event.target)) {
+        dropdown.classList.remove("open");
+        document.getElementById("langToggleBtn").setAttribute("aria-expanded", "false");
+      }
+    });
 
     function toggleTheme() {
       const root = document.documentElement;
@@ -424,6 +503,10 @@
 
       icon.className = isDark ? "fa-solid fa-sun" : "fa-solid fa-moon";
       text.textContent = isDark ? d.lightLabel : d.darkLabel;
+    }
+
+    function handleLoginClick() {
+      // جاهز للربط لاحقاً بما ستحدده عند الضغط على Connexion
     }
 
     updateThemeUI();
