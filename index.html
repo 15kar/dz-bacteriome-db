@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>dz-bacteriome-db</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     :root[data-theme="dark"] {
       --bg: #070b0a;
@@ -12,11 +13,13 @@
       --surface-2: #17221f;
       --text: #f3f7f5;
       --muted: #9fb0a8;
-      --border: rgba(255, 255, 255, 0.1);
+      --border: rgba(255, 255, 255, 0.12);
       --accent: #10b981;
       --accent-soft: rgba(16, 185, 129, 0.15);
       --gold: #eab308;
-      --shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+      --danger: #ef4444;
+      --danger-bg: #dc2626;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.55);
     }
 
     :root[data-theme="light"] {
@@ -25,18 +28,16 @@
       --surface-2: #eef4f0;
       --text: #0f1714;
       --muted: #4b5d55;
-      --border: rgba(15, 23, 20, 0.12);
+      --border: rgba(15, 23, 20, 0.14);
       --accent: #059669;
       --accent-soft: rgba(5, 150, 105, 0.12);
       --gold: #ca8a04;
-      --shadow: 0 16px 40px rgba(15, 23, 20, 0.08);
+      --danger: #dc2626;
+      --danger-bg: #dc2626;
+      --shadow: 0 16px 40px rgba(15, 23, 20, 0.1);
     }
 
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
       font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -47,248 +48,229 @@
       transition: background 0.25s ease, color 0.25s ease;
     }
 
-    .container {
-      width: min(1120px, 92%);
-      margin: 0 auto;
+    .top-toast {
+      position: fixed;
+      top: 14px;
+      left: 50%;
+      transform: translate(-50%, -140%);
+      z-index: 120;
+      max-width: 94vw;
+      width: fit-content;
+      background: var(--danger-bg);
+      color: #ffffff;
+      padding: 10px 18px;
+      border-radius: 999px;
+      box-shadow: 0 12px 30px rgba(220, 38, 38, 0.45);
+      font-size: clamp(0.76rem, 2.5vw, 0.92rem);
+      font-weight: 700;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: transform 0.28s ease, opacity 0.28s ease;
     }
 
+    .top-toast.show {
+      transform: translate(-50%, 0);
+      opacity: 1;
+    }
+
+    .container { width: min(1120px, 92%); margin: 0 auto; }
+
     header {
-      position: sticky;
-      top: 0;
-      z-index: 30;
+      position: sticky; top: 0; z-index: 30;
       backdrop-filter: blur(14px);
       background: color-mix(in srgb, var(--bg) 82%, transparent);
       border-bottom: 1px solid var(--border);
     }
 
     .nav {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      padding: 14px 0;
+      display: flex; flex-wrap: wrap; align-items: center;
+      justify-content: space-between; gap: 12px; padding: 14px 0;
     }
 
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 800;
-      font-size: 1.1rem;
-      letter-spacing: 0.2px;
-    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 1.1rem; }
 
     .brand-icon {
-      width: 34px;
-      height: 34px;
-      border-radius: 10px;
-      display: grid;
-      place-items: center;
-      background: var(--accent-soft);
-      color: var(--accent);
+      width: 34px; height: 34px; border-radius: 10px;
+      display: grid; place-items: center;
+      background: var(--accent-soft); color: var(--accent);
       border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
     }
 
-    .controls {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .dropdown {
-      position: relative;
-    }
+    .controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+    .dropdown { position: relative; }
 
     button {
-      cursor: pointer;
-      border: 1px solid var(--border);
-      background: var(--surface);
-      color: var(--text);
-      font-weight: 600;
-      font-size: 0.88rem;
-      padding: 8px 13px;
-      border-radius: 11px;
-      display: inline-flex;
-      align-items: center;
-      gap: 7px;
+      cursor: pointer; border: 1px solid var(--border);
+      background: var(--surface); color: var(--text);
+      font-weight: 600; font-size: 0.88rem;
+      padding: 8px 13px; border-radius: 11px;
+      display: inline-flex; align-items: center; gap: 7px;
       transition: all 0.2s ease;
     }
 
-    button:hover {
-      border-color: var(--accent);
-      background: var(--surface-2);
-    }
+    button:hover:not(:disabled) { border-color: var(--accent); background: var(--surface-2); }
+    button:active:not(:disabled) { transform: scale(0.98); }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
 
-    button:active {
-      transform: scale(0.97);
+    .primary-btn {
+      background: var(--accent); border-color: var(--accent); color: #ffffff;
+      justify-content: center;
     }
-
-    .login-btn {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #ffffff;
-    }
-
-    .login-btn:hover {
+    .primary-btn:hover:not(:disabled) {
       background: color-mix(in srgb, var(--accent) 88%, #000);
       border-color: var(--accent);
     }
 
-    .caret {
-      font-size: 0.75rem;
-      transition: transform 0.2s ease;
+    .link-btn {
+      background: transparent; border: none; color: var(--accent);
+      padding: 4px 6px; font-size: 0.84rem; text-decoration: underline;
     }
+    .link-btn:hover { background: transparent; border: none; opacity: 0.85; }
 
-    .dropdown.open .caret {
-      transform: rotate(180deg);
-    }
+    .caret { font-size: 0.75rem; transition: transform 0.2s ease; }
+    .dropdown.open .caret { transform: rotate(180deg); }
 
     .dropdown-menu {
-      position: absolute;
-      top: calc(100% + 8px);
-      inset-inline-start: 0;
-      min-width: 170px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 6px;
-      box-shadow: var(--shadow);
-      display: none;
-      flex-direction: column;
-      gap: 4px;
-      z-index: 40;
+      position: absolute; top: calc(100% + 8px); inset-inline-start: 0;
+      min-width: 170px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 14px;
+      padding: 6px; box-shadow: var(--shadow);
+      display: none; flex-direction: column; gap: 4px; z-index: 40;
     }
-
-    .dropdown.open .dropdown-menu {
-      display: flex;
-    }
+    .dropdown.open .dropdown-menu { display: flex; }
 
     .lang-option {
-      width: 100%;
-      justify-content: space-between;
-      border: 1px solid transparent;
-      background: transparent;
-      padding: 8px 11px;
-      border-radius: 9px;
+      width: 100%; justify-content: space-between;
+      border: 1px solid transparent; background: transparent;
+      padding: 8px 11px; border-radius: 9px;
     }
-
     .lang-option.active {
-      background: var(--accent-soft);
-      color: var(--accent);
+      background: var(--accent-soft); color: var(--accent);
       border-color: color-mix(in srgb, var(--accent) 35%, transparent);
     }
 
-    .hero {
-      padding: 56px 0 36px;
-      display: grid;
-      gap: 20px;
-    }
+    .hero { padding: 56px 0 36px; display: grid; gap: 20px; }
 
     .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      width: fit-content;
-      padding: 6px 14px;
-      border-radius: 999px;
-      background: var(--accent-soft);
-      color: var(--accent);
-      font-size: 0.85rem;
-      font-weight: 700;
+      display: inline-flex; align-items: center; gap: 8px; width: fit-content;
+      padding: 6px 14px; border-radius: 999px;
+      background: var(--accent-soft); color: var(--accent);
+      font-size: 0.85rem; font-weight: 700;
       border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
     }
 
-    h1 {
-      font-size: clamp(1.85rem, 4vw, 3.1rem);
-      line-height: 1.2;
-      font-weight: 900;
-    }
-
-    h1 span {
-      color: var(--accent);
-    }
-
-    .lead {
-      max-width: 760px;
-      color: var(--muted);
-      font-size: clamp(1rem, 1.5vw, 1.15rem);
-    }
+    h1 { font-size: clamp(1.85rem, 4vw, 3.1rem); line-height: 1.2; font-weight: 900; }
+    h1 span { color: var(--accent); }
+    .lead { max-width: 760px; color: var(--muted); font-size: clamp(1rem, 1.5vw, 1.15rem); }
 
     .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
-      gap: 18px;
-      padding: 18px 0 64px;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+      gap: 18px; padding: 18px 0 64px;
     }
 
     .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 18px;
-      padding: 22px;
-      box-shadow: var(--shadow);
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 18px; padding: 22px; box-shadow: var(--shadow);
       transition: transform 0.22s ease, border-color 0.22s ease;
     }
-
-    .card:hover {
-      transform: translateY(-4px);
-      border-color: color-mix(in srgb, var(--accent) 55%, transparent);
-    }
-
-    .card-top {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 14px;
-    }
-
+    .card:hover { transform: translateY(-4px); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+    .card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
     .card-tag {
-      display: inline-block;
-      font-size: 0.78rem;
-      font-weight: 700;
-      color: var(--gold);
+      font-size: 0.78rem; font-weight: 700; color: var(--gold);
       background: color-mix(in srgb, var(--gold) 14%, transparent);
-      padding: 4px 10px;
-      border-radius: 8px;
+      padding: 4px 10px; border-radius: 8px;
+    }
+    .card-icon { color: var(--accent); font-size: 1.15rem; }
+    .card h2 { font-size: 1.15rem; margin-bottom: 8px; }
+    .card p { color: var(--muted); font-size: 0.95rem; }
+
+    .modal-backdrop {
+      position: fixed; inset: 0; z-index: 60;
+      background: rgba(0, 0, 0, 0.72);
+      backdrop-filter: blur(6px);
+      display: none; align-items: center; justify-content: center;
+      padding: 16px; overflow-y: auto;
+    }
+    .modal-backdrop.open { display: flex; }
+
+    .modal {
+      width: min(560px, 100%);
+      max-height: 92vh; overflow-y: auto;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 22px; padding: 24px;
+      box-shadow: var(--shadow);
     }
 
-    .card-icon {
-      color: var(--accent);
-      font-size: 1.15rem;
-      transition: transform 0.25s ease;
+    .modal-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 16px; padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
     }
 
-    .card:hover .card-icon {
-      transform: scale(1.15);
+    .form-grid { display: grid; gap: 13px; }
+    .row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    @media (max-width: 520px) { .row-2 { grid-template-columns: 1fr; } }
+
+    .field { display: grid; gap: 6px; }
+    .field label { font-size: 0.86rem; font-weight: 700; color: var(--text); display: flex; align-items: center; gap: 7px; }
+    .field label i { color: var(--accent); }
+
+    input, select {
+      width: 100%; padding: 10px 12px;
+      border-radius: 11px; border: 1px solid var(--border);
+      background: var(--surface-2); color: var(--text);
+      font-size: 0.9rem; outline: none;
+    }
+    input:focus, select:focus { border-color: var(--accent); }
+
+    .file-box {
+      border: 1.5px dashed var(--border);
+      background: var(--surface-2);
+      border-radius: 12px; padding: 11px;
+      display: grid; gap: 6px;
+    }
+    .file-box.uploaded { border-color: var(--accent); background: var(--accent-soft); }
+    .file-status { font-size: 0.8rem; color: var(--muted); }
+
+    .auth-footer-actions {
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 8px; margin-top: 4px;
     }
 
-    .card h2 {
-      font-size: 1.15rem;
-      margin-bottom: 8px;
+    .step-indicator {
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 0.82rem; color: var(--muted);
+      background: var(--surface-2); padding: 8px 12px; border-radius: 10px;
     }
 
-    .card p {
-      color: var(--muted);
-      font-size: 0.95rem;
+    .status-box {
+      padding: 14px; border-radius: 14px;
+      background: var(--surface-2); border: 1px solid var(--border);
+      display: grid; gap: 8px; font-size: 0.9rem;
     }
+
+    .hidden { display: none !important; }
 
     footer {
-      border-top: 1px solid var(--border);
-      padding: 22px 0;
-      color: var(--muted);
-      font-size: 0.9rem;
-      text-align: center;
+      border-top: 1px solid var(--border); padding: 22px 0;
+      color: var(--muted); font-size: 0.9rem; text-align: center;
     }
-
-    footer i {
-      color: var(--accent);
-      margin: 0 4px;
-    }
+    footer i { color: var(--accent); margin: 0 4px; }
   </style>
 </head>
 <body>
+  <div class="top-toast" id="topToast" role="alert" aria-live="assertive">
+    <i class="fa-solid fa-circle-exclamation"></i>
+    <span id="topToastText"></span>
+  </div>
+
   <header>
     <div class="container nav">
       <div class="brand">
@@ -305,26 +287,23 @@
           </button>
           <div class="dropdown-menu" id="langMenu" role="menu">
             <button type="button" class="lang-option active" data-lang="ar" onclick="selectLang('ar')">
-              <span>العربية</span>
-              <i class="fa-solid fa-check"></i>
+              <span>العربية</span><i class="fa-solid fa-check"></i>
             </button>
             <button type="button" class="lang-option" data-lang="fr" onclick="selectLang('fr')">
-              <span>Français</span>
-              <i class="fa-solid fa-check"></i>
+              <span>Français</span><i class="fa-solid fa-check"></i>
             </button>
             <button type="button" class="lang-option" data-lang="en" onclick="selectLang('en')">
-              <span>English</span>
-              <i class="fa-solid fa-check"></i>
+              <span>English</span><i class="fa-solid fa-check"></i>
             </button>
           </div>
         </div>
 
-        <button type="button" class="theme-btn" id="themeBtn" onclick="toggleTheme()">
+        <button type="button" id="themeBtn" onclick="toggleTheme()">
           <i class="fa-solid fa-sun" id="themeIcon"></i>
           <span id="themeText">نهاري</span>
         </button>
 
-        <button type="button" class="login-btn" id="loginBtn" onclick="handleLoginClick()">
+        <button type="button" class="primary-btn" id="loginBtn" onclick="openModal('login')">
           <i class="fa-solid fa-right-to-bracket"></i>
           <span id="loginText">Connexion</span>
         </button>
@@ -346,39 +325,176 @@
 
     <section class="grid">
       <article class="card">
-        <div class="card-top">
-          <span class="card-tag">institutions</span>
-          <i class="fa-solid fa-building-columns card-icon"></i>
-        </div>
+        <div class="card-top"><span class="card-tag">institutions</span><i class="fa-solid fa-building-columns card-icon"></i></div>
         <h2 id="c1Title">المؤسسات المعتمدة</h2>
         <p id="c1Desc">الجامعات، المراكز الجامعية، الملحقات، المدارس العليا، والمعاهد ومراكز البحث بالاختصارات والأسماء الفرنسية.</p>
       </article>
       <article class="card">
-        <div class="card-top">
-          <span class="card-tag">profiles</span>
-          <i class="fa-solid fa-user-check card-icon"></i>
-        </div>
+        <div class="card-top"><span class="card-tag">profiles</span><i class="fa-solid fa-user-check card-icon"></i></div>
         <h2 id="c2Title">ملفات الباحثين</h2>
         <p id="c2Desc">ربط كل مساهم بمؤسسته وتخصصه مع رمز تعريفي فريد لا يُعاد (DZB-C-XXXX).</p>
       </article>
       <article class="card">
-        <div class="card-top">
-          <span class="card-tag">isolates</span>
-          <i class="fa-solid fa-vial-virus card-icon"></i>
-        </div>
+        <div class="card-top"><span class="card-tag">isolates</span><i class="fa-solid fa-vial-virus card-icon"></i></div>
         <h2 id="c3Title">العزلات البكتيرية</h2>
         <p id="c3Desc">توثيق الجنس والنوع، مصدر العزل، الولاية والإحداثيات، صبغة غرام، ورمز عزلة فريد (DZB-ISO-XXXXXX).</p>
       </article>
       <article class="card">
-        <div class="card-top">
-          <span class="card-tag">sequences & RLS</span>
-          <i class="fa-solid fa-dna card-icon"></i>
-        </div>
+        <div class="card-top"><span class="card-tag">sequences & RLS</span><i class="fa-solid fa-dna card-icon"></i></div>
         <h2 id="c4Title">التسلسلات الجينية والحماية</h2>
         <p id="c4Desc">حفظ تسلسلات 16S rRNA وغيرها مع حساب تلقائي لطول التسلسل وسياسات حماية صارمة.</p>
       </article>
     </section>
   </main>
+
+  <div class="modal-backdrop" id="authModal" onclick="if(event.target===this) closeAuthModal()">
+    <div class="modal">
+      <div class="modal-header">
+        <strong id="modalTitle"><i class="fa-solid fa-user-shield"></i> Connexion</strong>
+        <button type="button" onclick="closeAuthModal()"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="loginView" class="form-grid" onsubmit="handleLogin(event)">
+        <div class="field">
+          <label><i class="fa-solid fa-envelope"></i> <span id="lblLoginEmail">البريد الإلكتروني</span></label>
+          <input type="email" id="loginEmail" required placeholder="name@example.com" />
+        </div>
+
+        <div class="field">
+          <label><i class="fa-solid fa-lock"></i> <span id="lblLoginPass">كلمة السر</span></label>
+          <input type="password" id="loginPassword" required placeholder="••••••••" />
+        </div>
+
+        <button type="submit" class="primary-btn" id="btnLoginSubmit">
+          <i class="fa-solid fa-arrow-right-to-bracket"></i> <span id="txtLoginBtn">Connexion</span>
+        </button>
+
+        <div class="auth-footer-actions">
+          <button type="button" class="link-btn" onclick="openModal('register')">
+            <i class="fa-solid fa-user-plus"></i> <span id="txtOpenRegister">إنشاء حساب</span>
+          </button>
+          <button type="button" class="link-btn" onclick="openModal('forgot')">
+            <i class="fa-solid fa-key"></i> <span id="txtOpenForgot">نسيت كلمة السر</span>
+          </button>
+        </div>
+      </form>
+
+      <form id="registerView" class="form-grid hidden" onsubmit="handleRegisterSubmit(event)">
+        <div id="regStep1" class="form-grid">
+          <div class="step-indicator">
+            <span id="txtRegStep1"><i class="fa-solid fa-id-badge"></i> معلومات الحساب والوثائق</span>
+            <span>1 / 2</span>
+          </div>
+
+          <div class="row-2">
+            <div class="field">
+              <label><i class="fa-solid fa-user"></i> <span id="lblFirstName">الاسم</span></label>
+              <input type="text" id="firstName" oninput="checkRegStep1()" required />
+            </div>
+            <div class="field">
+              <label><i class="fa-solid fa-user"></i> <span id="lblLastName">اللقب</span></label>
+              <input type="text" id="lastName" oninput="checkRegStep1()" required />
+            </div>
+          </div>
+
+          <div class="row-2">
+            <div class="field">
+              <label><i class="fa-solid fa-envelope"></i> <span id="lblRegEmail">البريد الإلكتروني</span></label>
+              <input type="email" id="regEmail" oninput="checkRegStep1()" required />
+            </div>
+            <div class="field">
+              <label><i class="fa-solid fa-calendar-days"></i> <span id="lblDob">تاريخ الميلاد</span></label>
+              <input type="date" id="regDob" onchange="checkRegStep1()" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label><i class="fa-solid fa-building-columns"></i> <span id="lblInstitution">المؤسسة</span></label>
+            <input type="text" id="instSearch" oninput="filterInstitutions()" placeholder="USTHB, CRBt, IPA..." />
+            <select id="regInstitution" onchange="checkRegStep1()" required>
+              <option value="">-- اختر المؤسسة --</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label><i class="fa-solid fa-address-card"></i> <span id="lblNationalId">صورة بطاقة التعريف الوطنية</span></label>
+            <div class="file-box" id="nationalIdBox">
+              <input type="file" id="nationalIdFile" accept="image/*" onchange="onFilePick('nationalIdFile','nationalIdBox','nationalIdStatus')" required />
+              <span class="file-status" id="nationalIdStatus">...</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label><i class="fa-solid fa-graduation-cap"></i> <span id="lblProofDoc">صورة الشهادة المدرسية أو بطاقة طالب / أستاذ أو وثيقة إثبات الهوية</span></label>
+            <div class="file-box" id="proofDocBox">
+              <input type="file" id="proofDocFile" accept="image/*,.pdf" onchange="onFilePick('proofDocFile','proofDocBox','proofDocStatus')" required />
+              <span class="file-status" id="proofDocStatus">...</span>
+            </div>
+          </div>
+
+          <button type="button" class="primary-btn" id="nextToPasswordBtn" disabled onclick="goToRegStep2()">
+            <i class="fa-solid fa-lock"></i> <span id="txtNextPassword">اختيار كلمة السر</span>
+          </button>
+
+          <div class="auth-footer-actions">
+            <button type="button" class="link-btn" onclick="openModal('login')">
+              <i class="fa-solid fa-arrow-right"></i> <span id="txtBackToLogin1">العودة إلى تسجيل الدخول</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="regStep2" class="form-grid hidden">
+          <div class="step-indicator">
+            <span id="txtRegStep2"><i class="fa-solid fa-lock"></i> تعيين كلمة السر</span>
+            <span>2 / 2</span>
+          </div>
+
+          <div class="field">
+            <label><i class="fa-solid fa-key"></i> <span id="lblNewPass">كلمة السر</span></label>
+            <input type="password" id="regPassword" minlength="8" required />
+          </div>
+
+          <div class="field">
+            <label><i class="fa-solid fa-shield-halved"></i> <span id="lblConfirmPass">تأكيد كلمة السر</span></label>
+            <input type="password" id="regPasswordConfirm" minlength="8" required />
+          </div>
+
+          <div style="display:flex; gap:8px;">
+            <button type="button" onclick="backToRegStep1()"><i class="fa-solid fa-arrow-right"></i> <span id="txtBackStep1">رجوع</span></button>
+            <button type="submit" class="primary-btn" style="flex:1;" id="btnCreateAccount">
+              <i class="fa-solid fa-check"></i> <span id="txtSubmitReg">تأكيد إنشاء الحساب</span>
+            </button>
+          </div>
+        </div>
+      </form>
+
+      <div id="statusView" class="form-grid hidden">
+        <div class="status-box">
+          <strong id="statusTitle"></strong>
+          <p id="statusDesc" style="color:var(--muted);"></p>
+          <p id="statusCodeLine" style="font-size:0.84rem; color:var(--accent);"></p>
+        </div>
+        <button type="button" class="primary-btn" onclick="logoutAndClose()">
+          <i class="fa-solid fa-right-from-bracket"></i> <span id="txtLogout">إغلاق</span>
+        </button>
+      </div>
+
+      <form id="forgotView" class="form-grid hidden" onsubmit="handleForgotPassword(event)">
+        <div class="field">
+          <label><i class="fa-solid fa-envelope"></i> <span id="lblForgotEmail">البريد الإلكتروني</span></label>
+          <input type="email" id="forgotEmail" required placeholder="name@example.com" />
+        </div>
+        <button type="submit" class="primary-btn" id="btnSendReset">
+          <i class="fa-solid fa-paper-plane"></i> <span id="txtSendReset">إرسال رابط استعادة كلمة السر</span>
+        </button>
+        <div class="auth-footer-actions">
+          <button type="button" class="link-btn" onclick="openModal('login')">
+            <i class="fa-solid fa-arrow-right"></i> <span id="txtBackToLogin2">العودة إلى تسجيل الدخول</span>
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <footer>
     <div class="container">
@@ -388,62 +504,159 @@
   </footer>
 
   <script>
+    const SUPABASE_URL = "https://bqqpsljixpeqlpotaxdr.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_iw7xh83HUBtUCG6i5eCmkA_zCobFc9o";
+    const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    let allInstitutions = [];
+    let toastTimer = null;
+
     const i18n = {
       ar: {
         dir: "rtl",
         badge: "قاعدة بيانات ميكروبيولوجية مفتوحة • الجزائر",
         title: 'توثيق العزلات البكتيرية والتسلسلات الجينية في <span>الجزائر</span>',
         desc: "منصة علمية مفتوحة المصدر مبنية على PostgreSQL و Supabase لربط الباحثين بالمؤسسات الأكاديمية والبحثية المعتمدة وتوليد أكواد فريدة غير متكررة.",
-        c1t: "المؤسسات المعتمدة",
-        c1d: "الجامعات، المراكز الجامعية، الملحقات، المدارس العليا، والمعاهد ومراكز البحث بالاختصارات والأسماء الفرنسية.",
-        c2t: "ملفات الباحثين",
-        c2d: "ربط كل مساهم بمؤسسته وتخصصه مع رمز تعريفي فريد لا يُعاد (DZB-C-XXXX).",
-        c3t: "العزلات البكتيرية",
-        c3d: "توثيق الجنس والنوع، مصدر العزل، الولاية والإحداثيات، صبغة غرام، ورمز عزلة فريد (DZB-ISO-XXXXXX).",
-        c4t: "التسلسلات الجينية والحماية",
-        c4d: "حفظ تسلسلات 16S rRNA وغيرها مع حساب تلقائي لطول التسلسل وسياسات حماية صارمة.",
+        c1t: "المؤسسات المعتمدة", c1d: "الجامعات، المراكز الجامعية، الملحقات، المدارس العليا، والمعاهد ومراكز البحث بالاختصارات والأسماء الفرنسية.",
+        c2t: "ملفات الباحثين", c2d: "ربط كل مساهم بمؤسسته وتخصصه مع رمز تعريفي فريد لا يُعاد (DZB-C-XXXX).",
+        c3t: "العزلات البكتيرية", c3d: "توثيق الجنس والنوع، مصدر العزل، الولاية والإحداثيات، صبغة غرام، ورمز عزلة فريد (DZB-ISO-XXXXXX).",
+        c4t: "التسلسلات الجينية والحماية", c4d: "حفظ تسلسلات 16S rRNA وغيرها مع حساب تلقائي لطول التسلسل وسياسات حماية صارمة.",
         footer: "dz-bacteriome-db — منصة مفتوحة المصدر للبيانات الميكروبيولوجية والجينية",
-        lightLabel: "نهاري",
-        darkLabel: "ليلي",
-        loginLabel: "Connexion"
+        lightLabel: "نهاري", darkLabel: "ليلي",
+        loginBtn: "Connexion",
+        lblEmail: "البريد الإلكتروني",
+        lblPass: "كلمة السر",
+        openRegister: "إنشاء حساب",
+        openForgot: "نسيت كلمة السر",
+        backLogin: "العودة إلى تسجيل الدخول",
+        lblFirst: "الاسم",
+        lblLast: "اللقب",
+        lblDob: "تاريخ الميلاد",
+        lblInst: "المؤسسة",
+        selectInst: "-- اختر المؤسسة --",
+        lblNatId: "صورة بطاقة التعريف الوطنية",
+        lblProof: "صورة الشهادة المدرسية أو بطاقة طالب / أستاذ أو وثيقة إثبات الهوية",
+        noFile: "لم يتم اختيار ملف",
+        nextPass: "اختيار كلمة السر",
+        confirmPass: "تأكيد كلمة السر",
+        backStep1: "رجوع",
+        submitReg: "تأكيد إنشاء الحساب",
+        sendReset: "إرسال رابط استعادة كلمة السر",
+        closeBtn: "إغلاق",
+        errWrongCreds: "كلمة السر أو البريد الإلكتروني غير صحيح أو غير موجود",
+        errPassMismatch: "كلمتا المرور غير متطابقتين",
+        errBlocked: "هذا الحساب محظور ولا يُسمح بالدخول كلياً",
+        errRejected: "تم رفض طلب التحقق ولا يُسمح بالولوج",
+        errPending: "حسابك قيد التحقق حالياً ولا يمكن الولوج بعد",
+        pendingTitle: "الحساب قيد التحقق (en attente)",
+        pendingDesc: "تم تسجيل بياناتك ووثائقك بنجاح؛ الولوج إلى dashboard.html متاح بعد اعتماد الحساب.",
+        rejectedTitle: "تم الرفض (non)",
+        rejectedDesc: "نأسف، لم يتم قبول طلب التحقق ولا يُسمح بالدخول إلى المنصة.",
+        blockedTitle: "حساب محظور (bloquer)",
+        blockedDesc: "تم حظر هذا البريد الإلكتروني والحساب ولا يُسمح بالدخول كلياً."
       },
       fr: {
         dir: "ltr",
         badge: "Base de données microbiologique ouverte • Algérie",
         title: 'Documentation des isolats bactériens et séquences en <span>Algérie</span>',
         desc: "Plateforme scientifique open source sur PostgreSQL et Supabase reliant les chercheurs aux institutions agréées avec identifiants uniques non recyclables.",
-        c1t: "Institutions agréées",
-        c1d: "Universités, centres universitaires, annexes, écoles supérieures et instituts/centres avec acronymes et noms en français.",
-        c2t: "Profils chercheurs",
-        c2d: "Association de chaque contributeur à son institution et spécialité avec un code unique (DZB-C-XXXX).",
-        c3t: "Isolats bactériens",
-        c3d: "Genre, espèce, source d'isolement, wilaya, coordonnées, coloration de Gram et code unique (DZB-ISO-XXXXXX).",
-        c4t: "Séquences & Sécurité RLS",
-        c4d: "Séquences 16S rRNA et autres avec calcul automatique de la longueur et contrôle d'accès strict.",
+        c1t: "Institutions agréées", c1d: "Universités, centres universitaires, annexes, écoles supérieures et instituts/centres avec acronymes et noms en français.",
+        c2t: "Profils chercheurs", c2d: "Association de chaque contributeur à son institution et spécialité avec un code unique (DZB-C-XXXX).",
+        c3t: "Isolats bactériens", c3d: "Genre, espèce, source d'isolement, wilaya, coordonnées, coloration de Gram et code unique (DZB-ISO-XXXXXX).",
+        c4t: "Séquences & Sécurité RLS", c4d: "Séquences 16S rRNA et autres avec calcul automatique de la longueur et contrôle d'accès strict.",
         footer: "dz-bacteriome-db — Plateforme ouverte de microbiologie et génomique",
-        lightLabel: "Clair",
-        darkLabel: "Sombre",
-        loginLabel: "Connexion"
+        lightLabel: "Clair", darkLabel: "Sombre",
+        loginBtn: "Connexion",
+        lblEmail: "Adresse e-mail",
+        lblPass: "Mot de passe",
+        openRegister: "Créer un compte",
+        openForgot: "Mot de passe oublié",
+        backLogin: "Retour à la connexion",
+        lblFirst: "Prénom",
+        lblLast: "Nom",
+        lblDob: "Date de naissance",
+        lblInst: "Institution",
+        selectInst: "-- Choisir l'institution --",
+        lblNatId: "Photo de la carte d'identité nationale",
+        lblProof: "Photo du certificat scolaire, carte étudiant/enseignant ou pièce justificative",
+        noFile: "Aucun fichier sélectionné",
+        nextPass: "Choisir le mot de passe",
+        confirmPass: "Confirmer le mot de passe",
+        backStep1: "Retour",
+        submitReg: "Valider la création du compte",
+        sendReset: "Envoyer le lien de réinitialisation",
+        closeBtn: "Fermer",
+        errWrongCreds: "Mot de passe ou e-mail invalide ou introuvable",
+        errPassMismatch: "Les mots de passe ne correspondent pas",
+        errBlocked: "Ce compte est bloqué ; accès totalement interdit",
+        errRejected: "Votre demande a été refusée ; accès non autorisé",
+        errPending: "Compte en attente de vérification ; accès bloqué",
+        pendingTitle: "Compte en attente (en attente)",
+        pendingDesc: "Vos informations et documents sont enregistrés ; l'accès à dashboard.html sera ouvert après validation.",
+        rejectedTitle: "Demande refusée (non)",
+        rejectedDesc: "Votre demande de vérification a été refusée ; l'accès n'est pas autorisé.",
+        blockedTitle: "Compte bloqué (bloquer)",
+        blockedDesc: "Cet e-mail et ce compte sont bloqués ; l'accès est totalement interdit."
       },
       en: {
         dir: "ltr",
         badge: "Open Microbial Database • Algeria",
         title: 'Bacterial Isolates & Genetic Sequences Across <span>Algeria</span>',
         desc: "Open-source scientific platform on PostgreSQL and Supabase linking researchers to accredited institutions with non-reusable unique IDs.",
-        c1t: "Accredited Institutions",
-        c1d: "Universities, university centers, annexes, higher schools, and research institutes/centers with acronyms and French titles.",
-        c2t: "Researcher Profiles",
-        c2d: "Linking each contributor to their institution and specialty with a non-reusable unique ID (DZB-C-XXXX).",
-        c3t: "Bacterial Isolates",
-        c3d: "Genus, species, isolation source, wilaya, coordinates, Gram stain, and unique isolate code (DZB-ISO-XXXXXX).",
-        c4t: "Sequences & RLS Security",
-        c4d: "Storing 16S rRNA and other sequences with automatic length calculation and row-level security policies.",
+        c1t: "Accredited Institutions", c1d: "Universities, university centers, annexes, higher schools, and research institutes/centers with acronyms and French titles.",
+        c2t: "Researcher Profiles", c2d: "Linking each contributor to their institution and specialty with a non-reusable unique ID (DZB-C-XXXX).",
+        c3t: "Bacterial Isolates", c3d: "Genus, species, isolation source, wilaya, coordinates, Gram stain, and unique isolate code (DZB-ISO-XXXXXX).",
+        c4t: "Sequences & RLS Security", c4d: "Storing 16S rRNA and other sequences with automatic length calculation and row-level security policies.",
         footer: "dz-bacteriome-db — Open-Source Microbial & Genomic Database",
-        lightLabel: "Light",
-        darkLabel: "Dark",
-        loginLabel: "Connexion"
+        lightLabel: "Light", darkLabel: "Dark",
+        loginBtn: "Connexion",
+        lblEmail: "Email",
+        lblPass: "Password",
+        openRegister: "Create account",
+        openForgot: "Forgot password",
+        backLogin: "Back to login",
+        lblFirst: "First name",
+        lblLast: "Last name",
+        lblDob: "Date of birth",
+        lblInst: "Institution",
+        selectInst: "-- Select institution --",
+        lblNatId: "National ID card photo",
+        lblProof: "School certificate, student/faculty card, or identity proof photo",
+        noFile: "No file selected",
+        nextPass: "Choose password",
+        confirmPass: "Confirm password",
+        backStep1: "Back",
+        submitReg: "Complete registration",
+        sendReset: "Send password reset link",
+        closeBtn: "Close",
+        errWrongCreds: "Invalid or non-existent email or password",
+        errPassMismatch: "Passwords do not match",
+        errBlocked: "This account is blocked; access is strictly denied",
+        errRejected: "Your verification was rejected; access denied",
+        errPending: "Account is pending verification; access not allowed yet",
+        pendingTitle: "Pending verification (en attente)",
+        pendingDesc: "Your details and documents are saved; access to dashboard.html is enabled once approved.",
+        rejectedTitle: "Rejected (non)",
+        rejectedDesc: "Your verification request was rejected; access is not allowed.",
+        blockedTitle: "Blocked (bloquer)",
+        blockedDesc: "This email and account are blocked; access is strictly denied."
       }
     };
+
+    function getDict() {
+      return i18n[document.documentElement.lang] || i18n.ar;
+    }
+
+    function showRedToast(message) {
+      const toast = document.getElementById("topToast");
+      const textEl = document.getElementById("topToastText");
+      textEl.textContent = message;
+      toast.classList.add("show");
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove("show");
+      }, 3000);
+    }
 
     function toggleLangMenu(event) {
       event.stopPropagation();
@@ -469,20 +682,46 @@
       document.getElementById("c4Title").textContent = d.c4t;
       document.getElementById("c4Desc").textContent = d.c4d;
       document.getElementById("footerText").textContent = d.footer;
-      document.getElementById("loginText").textContent = d.loginLabel;
+      document.getElementById("loginText").textContent = d.loginBtn;
+      document.getElementById("lblLoginEmail").textContent = d.lblEmail;
+      document.getElementById("lblLoginPass").textContent = d.lblPass;
+      document.getElementById("txtOpenRegister").textContent = d.openRegister;
+      document.getElementById("txtOpenForgot").textContent = d.openForgot;
+      document.getElementById("txtBackToLogin1").textContent = d.backLogin;
+      document.getElementById("txtBackToLogin2").textContent = d.backLogin;
+      document.getElementById("lblFirstName").textContent = d.lblFirst;
+      document.getElementById("lblLastName").textContent = d.lblLast;
+      document.getElementById("lblRegEmail").textContent = d.lblEmail;
+      document.getElementById("lblDob").textContent = d.lblDob;
+      document.getElementById("lblInstitution").textContent = d.lblInst;
+      document.getElementById("lblNationalId").textContent = d.lblNatId;
+      document.getElementById("lblProofDoc").textContent = d.lblProof;
+      document.getElementById("txtNextPassword").textContent = d.nextPass;
+      document.getElementById("lblNewPass").textContent = d.lblPass;
+      document.getElementById("lblConfirmPass").textContent = d.confirmPass;
+      document.getElementById("txtBackStep1").textContent = d.backStep1;
+      document.getElementById("txtSubmitReg").textContent = d.submitReg;
+      document.getElementById("lblForgotEmail").textContent = d.lblEmail;
+      document.getElementById("txtSendReset").textContent = d.sendReset;
+      document.getElementById("txtLogout").textContent = d.closeBtn;
 
-      document.querySelectorAll(".lang-option").forEach(option => {
-        option.classList.toggle("active", option.dataset.lang === lang);
-      });
+      if (!document.getElementById("nationalIdFile").files.length) {
+        document.getElementById("nationalIdStatus").textContent = d.noFile;
+      }
+      if (!document.getElementById("proofDocFile").files.length) {
+        document.getElementById("proofDocStatus").textContent = d.noFile;
+      }
 
+      renderInstitutionOptions(allInstitutions);
+      document.querySelectorAll(".lang-option").forEach(o => o.classList.toggle("active", o.dataset.lang === lang));
       document.getElementById("langDropdown").classList.remove("open");
       document.getElementById("langToggleBtn").setAttribute("aria-expanded", "false");
       updateThemeUI();
     }
 
-    document.addEventListener("click", (event) => {
+    document.addEventListener("click", (e) => {
       const dropdown = document.getElementById("langDropdown");
-      if (dropdown && !dropdown.contains(event.target)) {
+      if (dropdown && !dropdown.contains(e.target)) {
         dropdown.classList.remove("open");
         document.getElementById("langToggleBtn").setAttribute("aria-expanded", "false");
       }
@@ -496,17 +735,237 @@
 
     function updateThemeUI() {
       const isDark = document.documentElement.dataset.theme === "dark";
-      const lang = document.documentElement.lang || "ar";
-      const d = i18n[lang];
-      const icon = document.getElementById("themeIcon");
-      const text = document.getElementById("themeText");
-
-      icon.className = isDark ? "fa-solid fa-sun" : "fa-solid fa-moon";
-      text.textContent = isDark ? d.lightLabel : d.darkLabel;
+      const d = getDict();
+      document.getElementById("themeIcon").className = isDark ? "fa-solid fa-sun" : "fa-solid fa-moon";
+      document.getElementById("themeText").textContent = isDark ? d.lightLabel : d.darkLabel;
     }
 
-    function handleLoginClick() {
-      // جاهز للربط لاحقاً بما ستحدده عند الضغط على Connexion
+    function openModal(viewName = "login") {
+      document.getElementById("authModal").classList.add("open");
+      ["loginView", "registerView", "statusView", "forgotView"].forEach(id => {
+        document.getElementById(id).classList.add("hidden");
+      });
+      if (viewName === "login") document.getElementById("loginView").classList.remove("hidden");
+      if (viewName === "register") {
+        document.getElementById("registerView").classList.remove("hidden");
+        backToRegStep1();
+        if (allInstitutions.length === 0) loadInstitutions();
+      }
+      if (viewName === "status") document.getElementById("statusView").classList.remove("hidden");
+      if (viewName === "forgot") document.getElementById("forgotView").classList.remove("hidden");
+    }
+
+    function closeAuthModal() {
+      document.getElementById("authModal").classList.remove("open");
+    }
+
+    async function loadInstitutions() {
+      const { data, error } = await supabaseClient
+        .from("institutions")
+        .select("id, acronym, name_fr, wilaya")
+        .eq("is_active", true)
+        .order("acronym", { ascending: true });
+      if (!error && data) {
+        allInstitutions = data;
+        renderInstitutionOptions(allInstitutions);
+      }
+    }
+
+    function renderInstitutionOptions(list) {
+      const d = getDict();
+      const select = document.getElementById("regInstitution");
+      const prev = select.value;
+      select.innerHTML = <option value="">${d.selectInst} (${list.length})</option>;
+      list.forEach(inst => {
+        const opt = document.createElement("option");
+        opt.value = inst.id;
+        opt.textContent = inst.wilaya ? ${inst.acronym} — ${inst.name_fr} (${inst.wilaya}) : ${inst.acronym} — ${inst.name_fr};
+        select.appendChild(opt);
+      });
+      if (prev) select.value = prev;
+    }
+
+    function filterInstitutions() {
+      const q = document.getElementById("instSearch").value.trim().toLowerCase();
+      const filtered = allInstitutions.filter(inst =>
+        inst.acronym.toLowerCase().includes(q) ||
+        inst.name_fr.toLowerCase().includes(q) ||
+        (inst.wilaya && inst.wilaya.toLowerCase().includes(q))
+      );
+      renderInstitutionOptions(filtered);
+      checkRegStep1();
+    }
+
+    function onFilePick(inputId, boxId, statusId) {
+      const input = document.getElementById(inputId);
+      const box = document.getElementById(boxId);
+      const status = document.getElementById(statusId);
+      if (input.files && input.files[0]) {
+        box.classList.add("uploaded");
+        status.innerHTML = <i class="fa-solid fa-circle-check"></i> ${input.files[0].name};
+      } else {
+        box.classList.remove("uploaded");
+        status.textContent = getDict().noFile;
+      }
+      checkRegStep1();
+    }
+
+    function checkRegStep1() {
+      const first = document.getElementById("firstName").value.trim();
+      const last = document.getElementById("lastName").value.trim();
+      const email = document.getElementById("regEmail").value.trim();
+      const dob = document.getElementById("regDob").value;
+      const inst = document.getElementById("regInstitution").value;
+      const f1 = document.getElementById("nationalIdFile").files.length > 0;
+      const f2 = document.getElementById("proofDocFile").files.length > 0;
+      document.getElementById("nextToPasswordBtn").disabled = !(first && last && email && dob && inst && f1 && f2);
+    }
+
+    function goToRegStep2() {
+      document.getElementById("regStep1").classList.add("hidden");
+      document.getElementById("regStep2").classList.remove("hidden");
+    }
+
+    function backToRegStep1() {
+      document.getElementById("regStep2").classList.add("hidden");
+      document.getElementById("regStep1").classList.remove("hidden");
+    }
+
+    function showStatusScreen(statusValue, code = "") {
+      const d = getDict();
+      openModal("status");
+      if (statusValue === "bloquer") {
+        document.getElementById("statusTitle").textContent = d.blockedTitle;
+        document.getElementById("statusDesc").textContent = d.blockedDesc;
+      } else if (statusValue === "non") {
+        document.getElementById("statusTitle").textContent = d.rejectedTitle;
+        document.getElementById("statusDesc").textContent = d.rejectedDesc;
+      } else {
+        document.getElementById("statusTitle").textContent = d.pendingTitle;
+        document.getElementById("statusDesc").textContent = d.pendingDesc;
+      }
+      document.getElementById("statusCodeLine").textContent = code ? ID: ${code} : "";
+    }
+
+    async function logoutAndClose() {
+      await supabaseClient.auth.signOut();
+      closeAuthModal();
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const d = getDict();
+      const email = document.getElementById("loginEmail").value.trim();
+      const password = document.getElementById("loginPassword").value;
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+      if (error || !data?.user) {
+        showRedToast(d.errWrongCreds);
+        return;
+      }
+
+      const { data: profile, error: pErr } = await supabaseClient
+        .from("profiles")
+        .select("verification_status, contributor_code")
+        .eq("id", data.user.id)
+        .single();
+
+      if (pErr || !profile) {
+        await supabaseClient.auth.signOut();
+        showRedToast(d.errWrongCreds);
+        return;
+      }
+
+      const st = (profile.verification_status || "en attente").toLowerCase().trim();
+      if (st === "oui") {
+        window.location.href = "dashboard.html";
+      } else if (st === "bloquer") {
+        await supabaseClient.auth.signOut();
+        showRedToast(d.errBlocked);
+        showStatusScreen("bloquer", profile.contributor_code || "");
+      } else if (st === "non") {
+        await supabaseClient.auth.signOut();
+        showRedToast(d.errRejected);
+        showStatusScreen("non", profile.contributor_code || "");
+      } else {
+        await supabaseClient.auth.signOut();
+        showRedToast(d.errPending);
+        showStatusScreen("en attente", profile.contributor_code || "");
+      }
+    }
+
+    async function handleRegisterSubmit(e) {
+      e.preventDefault();
+      const d = getDict();
+      const pass = document.getElementById("regPassword").value;
+      const confirm = document.getElementById("regPasswordConfirm").value;
+      if (pass !== confirm) {
+        showRedToast(d.errPassMismatch);
+        return;
+      }
+
+      const firstName = document.getElementById("firstName").value.trim();
+      const lastName = document.getElementById("lastName").value.trim();
+      const fullName = ${firstName} ${lastName}.trim();
+      const email = document.getElementById("regEmail").value.trim();
+      const dob = document.getElementById("regDob").value;
+      const institutionId = document.getElementById("regInstitution").value;
+      const natFile = document.getElementById("nationalIdFile").files[0];
+      const proofFile = document.getElementById("proofDocFile").files[0];
+
+      const { data: signUpData, error } = await supabaseClient.auth.signUp({
+        email,
+        password: pass,
+        options: {
+          data: {
+            first_name: firstName,
+            last_name: lastName,
+            full_name: fullName,
+            date_of_birth: dob,
+            institution_id: institutionId
+          }
+        }
+      });
+
+      if (error) {
+        showRedToast(error.message);
+        return;
+      }
+
+      const userId = signUpData?.user?.id;
+      if (userId && signUpData.session) {
+        const natPath = ${userId}/national_id_${Date.now()}_${natFile.name};
+        const proofPath = ${userId}/proof_doc_${Date.now()}_${proofFile.name};
+        await supabaseClient.storage.from("verification-docs").upload(natPath, natFile);
+        await supabaseClient.storage.from("verification-docs").upload(proofPath, proofFile);
+        await supabaseClient.from("profiles").update({
+          first_name: firstName,
+          last_name: lastName,
+          full_name: fullName,
+          date_of_birth: dob,
+          institution_id: institutionId,
+          id_document_path: natPath,
+          academic_proof_path: proofPath,
+          verification_status: "en attente"
+        }).eq("id", userId);
+        await supabaseClient.auth.signOut();
+      }
+
+      showStatusScreen("en attente");
+    }
+
+    async function handleForgotPassword(e) {
+      e.preventDefault();
+      const email = document.getElementById("forgotEmail").value.trim();
+      const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: ${window.location.origin}/index.html
+      });
+      if (error) {
+        showRedToast(error.message);
+      } else {
+        showRedToast(email);
+        openModal("login");
+      }
     }
 
     updateThemeUI();
