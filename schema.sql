@@ -23,14 +23,23 @@ create table if not exists public.profiles (
     contributor_code text unique,
     full_name text not null,
     email text unique,
+    date_of_birth date,
     institution_id uuid references public.institutions(id) on delete set null,
     department_or_specialty text,
+    id_document_path text,
+    academic_proof_path text,
     role text not null default 'contributor' check (role in ('admin', 'curator', 'contributor')),
     is_verified boolean not null default false,
     bio text,
     created_at timestamptz not null default now(),
     updated_at timestamptz not null default now()
 );
+
+-- التأكد من وجود الأعمدة الجديدة في حال كان الجدول منشأً مسبقاً
+alter table public.profiles
+add column if not exists date_of_birth date,
+add column if not exists id_document_path text,
+add column if not exists academic_proof_path text;
 
 -- ==========================================
 -- 3. جدول العزلات البكتيرية (isolates)
@@ -119,7 +128,47 @@ before insert on public.isolates
 for each row execute function public.assign_isolate_code();
 
 -- ==========================================
--- 6. فهارس لتسريع البحث والفرز
+-- 6. ربط إنشاء المستخدم في auth.users بجدول profiles تلقائياً
+-- ==========================================
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+    insert into public.profiles (
+        id,
+        full_name,
+        email,
+        date_of_birth,
+        institution_id,
+        department_or_specialty,
+        id_document_path,
+        academic_proof_path
+    )
+    values (
+        new.id,
+        coalesce(nullif(btrim(new.raw_user_meta_data ->> 'full_name'), ''), split_part(new.email, '@', 1)),
+        new.email,
+        nullif(new.raw_user_meta_data ->> 'date_of_birth', '')::date,
+        nullif(new.raw_user_meta_data ->> 'institution_id', '')::uuid,
+        nullif(btrim(new.raw_user_meta_data ->> 'department_or_specialty'), ''),
+        nullif(btrim(new.raw_user_meta_data ->> 'id_document_path'), ''),
+        nullif(btrim(new.raw_user_meta_data ->> 'academic_proof_path'), '')
+    )
+    on conflict (id) do nothing;
+
+    return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_user();
+
+-- ==========================================
+-- 7. فهارس لتسريع البحث والفرز
 -- ==========================================
 create index if not exists idx_institutions_category on public.institutions (category);
 create index if not exists idx_institutions_region on public.institutions (region);
@@ -132,7 +181,7 @@ create index if not exists idx_sequences_isolate on public.sequences (isolate_id
 create index if not exists idx_sequences_type on public.sequences (sequence_type);
 
 -- ==========================================
--- 7. دالة تحديث تاريخ التعديل تلقائياً
+-- 8. دالة تحديث تاريخ التعديل تلقائياً
 -- ==========================================
 create or replace function public.handle_updated_at()
 returns trigger
@@ -160,7 +209,7 @@ before update on public.sequences
 for each row execute function public.handle_updated_at();
 
 -- ==========================================
--- 8. تفعيل نظام الصلاحيات (Row Level Security)
+-- 9. تفعيل نظام الصلاحيات (Row Level Security)
 -- ==========================================
 alter table public.institutions enable row level security;
 alter table public.profiles enable row level security;
@@ -251,7 +300,32 @@ to authenticated
 using (auth.uid() = contributor_id);
 
 -- ==========================================
--- 9. إدخال كافة الجامعات والمدارس العليا والمعاهد المعتمدة
+-- 10. مخزن الوثائق الثبوتية الخاص (verification-docs)
+-- ==========================================
+insert into storage.buckets (id, name, public)
+values ('verification-docs', 'verification-docs', false)
+on conflict (id) do nothing;
+
+drop policy if exists "Users upload own verification docs" on storage.objects;
+create policy "Users upload own verification docs"
+on storage.objects for insert
+to authenticated
+with check (
+    bucket_id = 'verification-docs'
+    and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+drop policy if exists "Users read own verification docs" on storage.objects;
+create policy "Users read own verification docs"
+on storage.objects for select
+to authenticated
+using (
+    bucket_id = 'verification-docs'
+    and (storage.foldername(name))[1] = auth.uid()::text
+);
+
+-- ==========================================
+-- 11. إدخال كافة الجامعات والمدارس العليا والمعاهد المعتمدة
 -- ==========================================
 insert into public.institutions (acronym, name_fr, category, region, wilaya) values
 ('USTHB', 'Université des Sciences et de la Technologie Houari Boumediene', 'Université / Centre Universitaire', 'Centre', 'Alger'),
